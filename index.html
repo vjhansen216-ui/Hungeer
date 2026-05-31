@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Writing Assistant</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         /* 引入指定字体 */
         @font-face {
@@ -17,7 +18,7 @@
             margin: 0;
             padding: 0;
             font-family: 'CustomPrintFont', sans-serif;
-            border-radius: 0 !important; 
+            border-radius: 0 !important;
         }
 
         body {
@@ -46,18 +47,24 @@
             justify-content: center; align-items: center; z-index: 9999;
         }
 
+        #splash-avatar {
+            width: 80px; height: 80px; border: 2px solid #000;
+            margin-bottom: 30px; background-size: cover; background-position: center;
+            opacity: 0; animation: fadeIn 1s ease forwards;
+        }
+
         .typewriter {
             overflow: hidden; white-space: nowrap; border-right: 2px solid #000;
             font-size: 24px; letter-spacing: 2px;
-            animation: typing 3s steps(40, end), blink-caret .75s step-end infinite;
-            margin-bottom: 40px;
+            animation: typing 3s steps(40, end) 1s forwards, blink-caret .75s step-end infinite;
+            width: 0; margin-bottom: 40px;
         }
 
-        @keyframes typing { from { width: 0 } to { width: 330px } }
+        @keyframes typing { to { width: 330px } }
         @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: #000 } }
-
-        #enter-btn { padding: 10px 30px; font-size: 16px; opacity: 0; animation: fadeIn 1s ease 3s forwards; }
         @keyframes fadeIn { to { opacity: 1; } }
+
+        #enter-btn { padding: 10px 30px; font-size: 16px; opacity: 0; animation: fadeIn 1s ease 4s forwards; }
 
         /* 主界面 */
         #app-container { display: none; height: 100%; width: 100%; position: relative; flex-direction: column; }
@@ -71,12 +78,7 @@
 
         .icon-btn { width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; }
         
-        /* 绝对居中的头像组 */
-        .avatar-group {
-            position: absolute; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 15px;
-        }
-        
+        .avatar-group { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
         .avatar {
             width: 45px; height: 45px; border: 1px solid #000; cursor: pointer;
             background-size: cover; background-position: center;
@@ -91,10 +93,10 @@
         #sidebar {
             position: absolute; top: 0; left: -300px; width: 250px; height: 100%;
             background: #ffffff; border-right: 1px solid #000; transition: left 0.3s ease;
-            z-index: 100; padding: 80px 30px 30px 30px; display: flex; flex-direction: column; gap: 20px;
+            z-index: 100; padding: 80px 30px 30px 30px; display: flex; flex-direction: column; gap: 15px;
         }
         #sidebar.active { left: 0; }
-        .sidebar-item { padding: 15px; border: 1px solid #000; text-align: center; cursor: pointer; font-size: 14px; letter-spacing: 1px; }
+        .sidebar-item { padding: 12px; border: 1px solid #000; text-align: center; cursor: pointer; font-size: 14px; letter-spacing: 1px; }
 
         /* 遮罩层 */
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; z-index: 50; }
@@ -110,7 +112,7 @@
         #msg-input { flex: 1; padding: 15px; font-size: 16px; resize: none; height: 52px; overflow: hidden; }
         .action-btn { height: 52px; padding: 0 25px; font-size: 14px; letter-spacing: 1px; }
 
-        /* 弹窗样式 */
+        /* 弹窗通用样式 */
         .modal {
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 450px; background: #ffffff; border: 2px solid #000; padding: 30px;
@@ -120,22 +122,20 @@
         .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-size: 12px; text-transform: uppercase;}
         .form-group input, .form-group textarea { width: 100%; padding: 10px; }
-        
-        /* 针对 API 弹窗的网格按钮排版 */
         .grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
         .grid-actions .action-btn { height: 45px; width: 100%; padding: 0; }
 
-        /* 模型下拉列表 */
+        /* 模型下拉 */
         #model-dropdown {
             display: none; position: absolute; top: 100%; left: 0; width: 100%;
-            max-height: 150px; overflow-y: auto; background: #fff; border: 1px solid #000;
-            border-top: none; z-index: 10;
+            max-height: 150px; overflow-y: auto; background: #fff; border: 1px solid #000; border-top: none; z-index: 10;
         }
         .model-option { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 12px; }
         .model-option:hover { background: #000; color: #fff; }
 
-        /* Char 列表管理 */
-        #char-list { max-height: 150px; overflow-y: auto; border: 1px solid #000; margin-bottom: 20px; }
+        /* Char & Library 列表管理 */
+        .list-container { max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #000; margin-bottom: 20px; }
+        
         .char-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #000; cursor: pointer; }
         .char-item:last-child { border-bottom: none; }
         .char-item:hover, .char-item.active { background: #000; color: #fff; }
@@ -143,12 +143,29 @@
         
         #new-char-form { display: none; padding-top: 15px; border-top: 1px dashed #000; }
 
+        /* 库列表向右滑动删除样式 */
+        .lib-item-wrapper { position: relative; border-bottom: 1px solid #000; width: 100%; height: 50px; }
+        .lib-item-wrapper:last-child { border-bottom: none; }
+        .lib-btn-delete { 
+            position: absolute; left: 0; top: 0; width: 80px; height: 100%;
+            background: #000; color: #fff; display: flex; justify-content: center; align-items: center;
+            font-size: 12px; cursor: pointer; text-transform: uppercase; font-weight: bold;
+        }
+        .lib-item-content {
+            position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+            background: #fff; display: flex; align-items: center; padding: 0 15px;
+            cursor: pointer; z-index: 2; transition: transform 0.3s ease; user-select: none;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px;
+        }
+        .lib-item-content:hover { background: #f0f0f0; }
+
         input[type="file"] { display: none; }
     </style>
 </head>
 <body>
 
     <div id="splash-screen">
+        <div id="splash-avatar"></div>
         <div class="typewriter">你的所有烦恼我都想为你解决</div>
         <button id="enter-btn" onclick="enterApp()">ENTER</button>
     </div>
@@ -156,13 +173,14 @@
     <input type="file" id="right-avatar-upload" accept="image/*">
     <input type="file" id="left-avatar-upload" accept="image/*">
     <input type="file" id="char-avatar-upload" accept="image/*">
+    <input type="file" id="import-zip" accept=".zip">
 
     <div id="app-container">
         <header>
             <button class="icon-btn" onclick="toggleSidebar()">≡</button>
             <div class="avatar-group">
-                <div class="avatar" id="left-avatar" onclick="document.getElementById('left-avatar-upload').click()" style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 stroke=%22black%22 viewBox=%220 0 24 24%22><path stroke-linecap=%22square%22 stroke-linejoin=%22miter%22 stroke-width=%222%22 d=%22M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8v4l3 3%22></path></svg>');"></div>
-                <div class="avatar" id="right-avatar" onclick="document.getElementById('right-avatar-upload').click()" style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 stroke=%22black%22 viewBox=%220 0 24 24%22><path stroke-linecap=%22square%22 stroke-linejoin=%22miter%22 stroke-width=%222%22 d=%22M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z%22></path></svg>');"></div>
+                <div class="avatar" id="left-avatar" onclick="document.getElementById('left-avatar-upload').click()"></div>
+                <div class="avatar" id="right-avatar" onclick="document.getElementById('right-avatar-upload').click()"></div>
             </div>
             <button class="action-btn" onclick="openCharModal()">CHAR</button>
         </header>
@@ -170,9 +188,11 @@
         <div id="sidebar">
             <button class="icon-btn" style="position:absolute; top:20px; right:20px;" onclick="toggleSidebar()">×</button>
             <div class="sidebar-item" onclick="openModal('api-modal'); toggleSidebar();">API</div>
-            <div class="sidebar-item" onclick="alert('Chat saved!')">SAVE</div>
+            <div class="sidebar-item" onclick="saveCurrentChat()">SAVE</div>
             <div class="sidebar-item" onclick="newChat()">NEW</div>
-            <div class="sidebar-item" onclick="alert('LIBRARY: Empty.')">LIBRARY</div>
+            <div class="sidebar-item" onclick="openLibraryModal(); toggleSidebar();">LIBRARY</div>
+            <div class="sidebar-item" onclick="exportBackup()">BACKUP</div>
+            <div class="sidebar-item" onclick="document.getElementById('import-zip').click(); toggleSidebar();">IMPORT</div>
         </div>
         <div id="overlay" onclick="toggleSidebar()"></div>
 
@@ -212,10 +232,7 @@
 
     <div id="char-modal" class="modal">
         <h2>Characters</h2>
-        
-        <div id="char-list">
-            </div>
-
+        <div id="char-list" class="list-container"></div>
         <button class="action-btn" style="width: 100%; height: 40px; margin-bottom: 10px;" onclick="toggleNewCharForm()">+ CREATE NEW CHAR</button>
 
         <div id="new-char-form">
@@ -239,29 +256,57 @@
         </div>
     </div>
 
+    <div id="library-modal" class="modal">
+        <h2>Library</h2>
+        <div id="library-list" class="list-container"></div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button class="action-btn" style="height: 40px;" onclick="closeModal('library-modal')">Close</button>
+        </div>
+    </div>
+
     <script>
         let chars = JSON.parse(localStorage.getItem('savedChars')) || [];
+        let savedChats = JSON.parse(localStorage.getItem('savedChats')) || [];
         let activeCharId = localStorage.getItem('activeCharId') || null;
-        let tempNewCharAvatarData = ''; // 暂存新建char的头像数据
+        let tempNewCharAvatarData = '';
 
-        // === 基础交互 ===
+        // === 初始化与开屏 ===
+        window.onload = () => {
+            const defaultUserSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>';
+            const defaultAiSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8v4l3 3"></path></svg>';
+            
+            document.getElementById('right-avatar').style.backgroundImage = `url('${localStorage.getItem('userAvatar') || defaultUserSvg}')`;
+            document.getElementById('left-avatar').style.backgroundImage = `url('${defaultAiSvg}')`;
+
+            // 开屏随机选取 Char 头像
+            if (chars.length > 0) {
+                const randomChar = chars[Math.floor(Math.random() * chars.length)];
+                if (randomChar.avatar) {
+                    document.getElementById('splash-avatar').style.backgroundImage = `url('${randomChar.avatar}')`;
+                } else {
+                    document.getElementById('splash-avatar').style.backgroundImage = `url('${defaultAiSvg}')`;
+                }
+            } else {
+                document.getElementById('splash-avatar').style.backgroundImage = `url('${defaultAiSvg}')`;
+            }
+        };
+
         function enterApp() {
             document.getElementById('splash-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
             loadConfig();
-            renderCharList();
         }
 
+        // === 基础交互 ===
         function toggleSidebar() {
             const sb = document.getElementById('sidebar');
             sb.classList.toggle('active');
             document.getElementById('overlay').style.display = sb.classList.contains('active') ? 'block' : 'none';
         }
-
         function openModal(id) { document.getElementById(id).style.display = 'block'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-        // === 头像处理 ===
+        // 头像处理
         function setupAvatarUpload(inputId, callback) {
             document.getElementById(inputId).addEventListener('change', function(e) {
                 const file = e.target.files[0];
@@ -272,173 +317,121 @@
                 }
             });
         }
-        
-        // 用户右侧头像独立
-        setupAvatarUpload('right-avatar-upload', data => {
-            setElementBackground('right-avatar', data);
-        });
-        // 左侧头像手动上传（会被Char的头像覆盖，但允许手动改）
-        setupAvatarUpload('left-avatar-upload', data => {
-            setElementBackground('left-avatar', data);
-        });
-        // 新建Char的头像选取
-        setupAvatarUpload('char-avatar-upload', data => {
-            tempNewCharAvatarData = data;
-            setElementBackground('new-char-avatar-preview', data);
-        });
+        setupAvatarUpload('right-avatar-upload', data => { document.getElementById('right-avatar').style.backgroundImage = `url(${data})`; localStorage.setItem('userAvatar', data); });
+        setupAvatarUpload('left-avatar-upload', data => { document.getElementById('left-avatar').style.backgroundImage = `url(${data})`; });
+        setupAvatarUpload('char-avatar-upload', data => { tempNewCharAvatarData = data; document.getElementById('new-char-avatar-preview').style.backgroundImage = `url(${data})`; document.getElementById('new-char-avatar-preview').innerText = '';});
 
-        function setElementBackground(id, dataUrl) {
-            const el = document.getElementById(id);
-            el.style.backgroundImage = `url(${dataUrl})`;
-            el.innerHTML = '';
-        }
-
-        // === API 拉取模型逻辑 ===
-        async function fetchModels(btn) {
-            const originalText = btn.innerText;
-            btn.innerText = "FETCHING...";
+        // === 备份与导入 (Zip 逻辑) ===
+        async function exportBackup() {
+            toggleSidebar();
+            const zip = new JSZip();
+            const dataStr = JSON.stringify(localStorage);
+            zip.file("backup.json", dataStr);
             
-            let url = document.getElementById('api-url').value;
-            let key = document.getElementById('api-key').value;
-            
-            // 尝试将 /chat/completions 替换为 /models，兼容大部分代理站格式
-            let modelUrl = url.split('/v1/')[0] + '/v1/models';
-
-            try {
-                const res = await fetch(modelUrl, { headers: { 'Authorization': `Bearer ${key}` } });
-                if(!res.ok) throw new Error("API Refused");
-                const data = await res.json();
-                
-                // 渲染下拉列表
-                const dropdown = document.getElementById('model-dropdown');
-                dropdown.innerHTML = '';
-                dropdown.style.display = 'block';
-                
-                (data.data || []).forEach(m => {
-                    let opt = document.createElement('div');
-                    opt.className = 'model-option';
-                    opt.innerText = m.id;
-                    opt.onclick = () => {
-                        document.getElementById('api-model').value = m.id;
-                        dropdown.style.display = 'none';
-                    };
-                    dropdown.appendChild(opt);
-                });
-            } catch (e) {
-                alert("Failed to fetch models. Please ensure URL and Key are correct, or enter model ID manually.");
-            }
-            btn.innerText = originalText;
+            const blob = await zip.generateAsync({type:"blob"});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "writing_assistant_backup.zip";
+            a.click();
         }
 
-        // 点击其他地方关闭下拉框
-        document.addEventListener('click', (e) => {
-            if(!e.target.closest('.form-group')) {
-                document.getElementById('model-dropdown').style.display = 'none';
-            }
+        document.getElementById('import-zip').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            JSZip.loadAsync(file).then(function(zip) {
+                return zip.file("backup.json").async("string");
+            }).then(function(text) {
+                const data = JSON.parse(text);
+                localStorage.clear();
+                for (let key in data) localStorage.setItem(key, data[key]);
+                alert("Import successful! Reloading to apply changes.");
+                location.reload();
+            }).catch(function(err) {
+                alert("Import failed. Ensure it is a valid backup zip file. Error: " + err);
+            });
         });
 
-        // === API 配置 ===
-        function saveApiConfig() {
-            localStorage.setItem('apiUrl', document.getElementById('api-url').value);
-            localStorage.setItem('apiKey', document.getElementById('api-key').value);
-            localStorage.setItem('apiModel', document.getElementById('api-model').value);
-            alert("API Saved!");
-            closeModal('api-modal');
-        }
-
-        async function testConnection(btn) {
-            btn.innerText = "TESTING...";
-            try {
-                const res = await fetch(document.getElementById('api-url').value, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${document.getElementById('api-key').value}` },
-                    body: JSON.stringify({ model: document.getElementById('api-model').value, messages: [{role: "user", content: "hi"}] })
-                });
-                alert(res.ok ? "Success!" : "Failed!");
-            } catch (e) { alert("Error: " + e.message); }
-            btn.innerText = "Test";
-        }
-
-        // === Char 管理系统 ===
-        function openCharModal() {
-            renderCharList();
-            openModal('char-modal');
-        }
-
-        function toggleNewCharForm() {
-            const form = document.getElementById('new-char-form');
-            form.style.display = form.style.display === 'block' ? 'none' : 'block';
-        }
-
-        function saveNewChar() {
-            const name = document.getElementById('new-char-name').value.trim();
-            const details = document.getElementById('new-char-details').value.trim();
-            if(!name) return alert("Name is required!");
-
-            const newChar = {
+        // === 对话与库管理 ===
+        function saveCurrentChat() {
+            const htmlContent = document.getElementById('chat-area').innerHTML;
+            const previewText = document.getElementById('chat-area').innerText.substring(0, 30).replace(/\n/g, ' ') + '...';
+            const chatObj = {
                 id: Date.now().toString(),
-                name: name,
-                details: details,
-                avatar: tempNewCharAvatarData
+                date: new Date().toLocaleString(),
+                preview: previewText,
+                html: htmlContent
             };
-            
-            chars.push(newChar);
-            localStorage.setItem('savedChars', JSON.stringify(chars));
-            
-            // 重置表单
-            document.getElementById('new-char-name').value = '';
-            document.getElementById('new-char-details').value = '';
-            document.getElementById('new-char-avatar-preview').style.backgroundImage = '';
-            document.getElementById('new-char-avatar-preview').innerText = 'Avatar';
-            tempNewCharAvatarData = '';
-            
-            toggleNewCharForm();
-            renderCharList();
+            savedChats.unshift(chatObj);
+            localStorage.setItem('savedChats', JSON.stringify(savedChats));
+            alert("Chat successfully saved to Library!");
+            toggleSidebar();
         }
 
-        function renderCharList() {
-            const listEl = document.getElementById('char-list');
+        function openLibraryModal() {
+            const listEl = document.getElementById('library-list');
             listEl.innerHTML = '';
-            
-            if(chars.length === 0) {
-                listEl.innerHTML = '<div style="padding:10px; text-align:center; font-size:12px;">No chars yet.</div>';
+            if(savedChats.length === 0) {
+                listEl.innerHTML = '<div style="padding:10px; text-align:center; font-size:12px;">Library is empty.</div>';
+                openModal('library-modal');
                 return;
             }
 
-            chars.forEach(char => {
-                const item = document.createElement('div');
-                item.className = `char-item ${char.id === activeCharId ? 'active' : ''}`;
+            savedChats.forEach(chat => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'lib-item-wrapper';
                 
-                const bgStyle = char.avatar ? `background-image: url(${char.avatar});` : '';
-                item.innerHTML = `
-                    <div class="char-item-avatar" style="${bgStyle}"></div>
-                    <div>${char.name}</div>
-                `;
+                // 删除按钮
+                const delBtn = document.createElement('div');
+                delBtn.className = 'lib-btn-delete';
+                delBtn.innerText = 'DELETE';
+                delBtn.onclick = () => { deleteChat(chat.id); };
+
+                // 可滑动的内容区域
+                const content = document.createElement('div');
+                content.className = 'lib-item-content';
+                content.innerText = `[${chat.date}] ${chat.preview}`;
+                content.onclick = () => { loadChat(chat.html); closeModal('library-modal'); };
+
+                // 纯 JS 实现向右滑动交互
+                let startX = 0;
+                let currentTranslate = 0;
                 
-                item.onclick = () => selectChar(char.id);
-                listEl.appendChild(item);
+                content.addEventListener('pointerdown', (e) => { startX = e.clientX; content.style.transition = 'none'; content.setPointerCapture(e.pointerId); });
+                content.addEventListener('pointermove', (e) => {
+                    if (startX === 0) return;
+                    let diff = e.clientX - startX;
+                    if (diff > 0 && diff <= 80) currentTranslate = diff; // 向右滑动
+                    else if (diff > 80) currentTranslate = 80;
+                    else currentTranslate = 0; // 不允许向左滑出界
+                    content.style.transform = `translateX(${currentTranslate}px)`;
+                });
+                content.addEventListener('pointerup', (e) => {
+                    startX = 0; content.style.transition = 'transform 0.3s ease';
+                    if (currentTranslate > 40) { currentTranslate = 80; } else { currentTranslate = 0; }
+                    content.style.transform = `translateX(${currentTranslate}px)`;
+                });
+
+                wrapper.appendChild(delBtn);
+                wrapper.appendChild(content);
+                listEl.appendChild(wrapper);
             });
+            openModal('library-modal');
         }
 
-        function selectChar(id) {
-            activeCharId = id;
-            localStorage.setItem('activeCharId', id);
-            renderCharList();
-            
-            const activeChar = chars.find(c => c.id === id);
-            if(activeChar) {
-                // Char 列表中的头像优先级最高，覆盖主界面左侧头像
-                if(activeChar.avatar) {
-                    setElementBackground('left-avatar', activeChar.avatar);
-                } else {
-                    document.getElementById('left-avatar').style.backgroundImage = '';
-                    document.getElementById('left-avatar').innerText = activeChar.name.charAt(0);
-                }
-                document.getElementById('welcome-msg').innerText = `[System] Activated Char: ${activeChar.name}`;
-            }
+        function deleteChat(id) {
+            savedChats = savedChats.filter(c => c.id !== id);
+            localStorage.setItem('savedChats', JSON.stringify(savedChats));
+            openLibraryModal(); // 刷新列表
         }
 
-        // === 聊天与初始化 ===
+        function loadChat(html) { document.getElementById('chat-area').innerHTML = html; }
+        function newChat() {
+            document.getElementById('chat-area').innerHTML = '<div class="message msg-ai" id="welcome-msg">[System] New conversation started.</div>';
+            toggleSidebar();
+            if(activeCharId) selectChar(activeCharId);
+        }
+
+        // === API 与发送交互 (复用原有逻辑) ===
         const msgInput = document.getElementById('msg-input');
         msgInput.addEventListener('keypress', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
 
@@ -462,19 +455,16 @@
             const url = localStorage.getItem('apiUrl');
             const key = localStorage.getItem('apiKey');
             const model = localStorage.getItem('apiModel');
-            
             const activeChar = chars.find(c => c.id === activeCharId) || { name: 'Assistant', details: 'You are a helpful writing assistant.' };
 
             if (!url || !key) return alert("Please configure API settings first.");
 
             let messages = [{ role: "system", content: `You are ${activeChar.name}. ${activeChar.details} Respond in character.` }];
-            
             document.querySelectorAll('.message').forEach(el => {
                 if (el.id !== 'welcome-msg') messages.push({ role: el.classList.contains('msg-user') ? 'user' : 'assistant', content: el.innerText });
             });
 
             if (messages.length === 1) return;
-
             const loadingMsg = appendMessage('...', 'ai');
 
             try {
@@ -489,18 +479,102 @@
             } catch (error) { loadingMsg.innerText = "[Error] " + error.message; }
         }
 
+        async function fetchModels(btn) {
+            const originalText = btn.innerText;
+            btn.innerText = "FETCHING...";
+            let url = document.getElementById('api-url').value;
+            let key = document.getElementById('api-key').value;
+            let modelUrl = url.split('/v1/')[0] + '/v1/models';
+
+            try {
+                const res = await fetch(modelUrl, { headers: { 'Authorization': `Bearer ${key}` } });
+                if(!res.ok) throw new Error("API Refused");
+                const data = await res.json();
+                const dropdown = document.getElementById('model-dropdown');
+                dropdown.innerHTML = ''; dropdown.style.display = 'block';
+                (data.data || []).forEach(m => {
+                    let opt = document.createElement('div'); opt.className = 'model-option'; opt.innerText = m.id;
+                    opt.onclick = () => { document.getElementById('api-model').value = m.id; dropdown.style.display = 'none'; };
+                    dropdown.appendChild(opt);
+                });
+            } catch (e) { alert("Fetch failed. Enter model manually."); }
+            btn.innerText = originalText;
+        }
+
+        document.addEventListener('click', (e) => { if(!e.target.closest('.form-group')) document.getElementById('model-dropdown').style.display = 'none'; });
+
+        function saveApiConfig() {
+            localStorage.setItem('apiUrl', document.getElementById('api-url').value);
+            localStorage.setItem('apiKey', document.getElementById('api-key').value);
+            localStorage.setItem('apiModel', document.getElementById('api-model').value);
+            alert("API Saved!"); closeModal('api-modal');
+        }
+
+        async function testConnection(btn) {
+            btn.innerText = "TESTING...";
+            try {
+                const res = await fetch(document.getElementById('api-url').value, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${document.getElementById('api-key').value}` },
+                    body: JSON.stringify({ model: document.getElementById('api-model').value, messages: [{role: "user", content: "hi"}] })
+                });
+                alert(res.ok ? "Success!" : "Failed!");
+            } catch (e) { alert("Error: " + e.message); }
+            btn.innerText = "Test";
+        }
+
+        // === Char 管理 ===
+        function openCharModal() { renderCharList(); openModal('char-modal'); }
+        function toggleNewCharForm() {
+            const form = document.getElementById('new-char-form');
+            form.style.display = form.style.display === 'block' ? 'none' : 'block';
+        }
+        function saveNewChar() {
+            const name = document.getElementById('new-char-name').value.trim();
+            const details = document.getElementById('new-char-details').value.trim();
+            if(!name) return alert("Name required!");
+
+            chars.push({ id: Date.now().toString(), name: name, details: details, avatar: tempNewCharAvatarData });
+            localStorage.setItem('savedChars', JSON.stringify(chars));
+            
+            document.getElementById('new-char-name').value = ''; document.getElementById('new-char-details').value = '';
+            document.getElementById('new-char-avatar-preview').style.backgroundImage = ''; document.getElementById('new-char-avatar-preview').innerText = 'Avatar';
+            tempNewCharAvatarData = '';
+            toggleNewCharForm(); renderCharList();
+        }
+
+        function renderCharList() {
+            const listEl = document.getElementById('char-list'); listEl.innerHTML = '';
+            if(chars.length === 0) { listEl.innerHTML = '<div style="padding:10px; text-align:center; font-size:12px;">No chars yet.</div>'; return; }
+
+            chars.forEach(char => {
+                const item = document.createElement('div');
+                item.className = `char-item ${char.id === activeCharId ? 'active' : ''}`;
+                item.innerHTML = `<div class="char-item-avatar" style="${char.avatar ? `background-image: url(${char.avatar});` : ''}"></div><div>${char.name}</div>`;
+                item.onclick = () => selectChar(char.id);
+                listEl.appendChild(item);
+            });
+        }
+
+        function selectChar(id) {
+            activeCharId = id; localStorage.setItem('activeCharId', id); renderCharList();
+            const activeChar = chars.find(c => c.id === id);
+            if(activeChar) {
+                if(activeChar.avatar) {
+                    document.getElementById('left-avatar').style.backgroundImage = `url(${activeChar.avatar})`;
+                    document.getElementById('left-avatar').innerText = '';
+                } else {
+                    document.getElementById('left-avatar').style.backgroundImage = '';
+                    document.getElementById('left-avatar').innerText = activeChar.name.charAt(0);
+                }
+                document.getElementById('welcome-msg').innerText = `[System] Activated Char: ${activeChar.name}`;
+            }
+        }
+
         function loadConfig() {
             document.getElementById('api-url').value = localStorage.getItem('apiUrl') || '';
             document.getElementById('api-key').value = localStorage.getItem('apiKey') || '';
             document.getElementById('api-model').value = localStorage.getItem('apiModel') || 'gpt-4';
-            
             if(activeCharId) selectChar(activeCharId);
-        }
-
-        function newChat() {
-            document.getElementById('chat-area').innerHTML = '<div class="message msg-ai" id="welcome-msg">[System] New conversation started.</div>';
-            toggleSidebar();
-            if(activeCharId) selectChar(activeCharId); // 恢复初始提示
         }
     </script>
 </body>
